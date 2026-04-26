@@ -40,6 +40,77 @@ void increment_repid()
     fclose(f);
 }
 
+//UNUSED FOR NOW!; DIDN'T MAKE USE OF LINKS
+void check_link( char link[30] )
+{
+    struct stat st;
+    if ( lstat(link,&st) == -1 )
+    {
+        printf("Warning : link points to an inexistent file");
+    }   
+}
+
+void obtain_permissions( char filepath[20], char perm_string[20] )
+{
+    struct stat st;
+    strcpy(perm_string,"");
+    stat(filepath,&st);
+
+    int pbits;
+    pbits = (S_IRWXU & st.st_mode) / S_IXUSR;
+    ( (pbits & 4) == 4 ) ? strcat(perm_string,"r") : strcat(perm_string,"-");
+    ( (pbits & 2) == 2 ) ? strcat(perm_string,"w") : strcat(perm_string,"-");
+    ( (pbits & 1) == 1 ) ? strcat(perm_string,"x") : strcat(perm_string,"-");
+
+    pbits = (S_IRWXG & st.st_mode) / S_IXGRP;
+    ( (pbits & 4) == 4 ) ? strcat(perm_string,"r") : strcat(perm_string,"-");
+    ( (pbits & 2) == 2 ) ? strcat(perm_string,"w") : strcat(perm_string,"-");
+    ( (pbits & 1) == 1 ) ? strcat(perm_string,"x") : strcat(perm_string,"-");
+
+    pbits = (S_IRWXO & st.st_mode) / S_IXOTH;
+    ( (pbits & 4) == 4 ) ? strcat(perm_string,"r") : strcat(perm_string,"-");
+    ( (pbits & 2) == 2 ) ? strcat(perm_string,"w") : strcat(perm_string,"-");
+    ( (pbits & 1) == 1 ) ? strcat(perm_string,"x") : strcat(perm_string,"-");
+}
+
+int check_Rperm( char role[10], char perm_string[20] )
+{
+    if ( strcmp(role,"manager") )
+    {
+        if ( perm_string[0] == 'r' )
+            return 1;
+        else
+            return 0;
+    }
+    if ( strcmp(role,"inspector") )
+    {
+        if ( perm_string[3] == 'r' )
+            return 1;
+        else
+            return 0;
+    }
+    return 0;
+}
+
+int check_Wperm( char role[10], char perm_string[20] )
+{
+    if ( strcmp(role,"manager") )
+    {
+        if ( perm_string[1] == 'w' )
+            return 1;
+        else
+            return 0;
+    }
+    if ( strcmp(role,"inspector") )
+    {
+        if ( perm_string[4] == 'w' )
+            return 1;
+        else
+            return 0;
+    }
+    return 0;
+}
+
 void create_files ( char dirpath[20] )
 {
     int fd;
@@ -95,6 +166,12 @@ void setup_directory ( char name[20] )
     {
         create_files(dirpath);
     }
+
+    char linkname[30];
+    strcpy(linkname,"active_reports-");
+    strcat(linkname,name);
+    strcat(dirpath,"reports.dat");
+    symlink(dirpath,linkname);  
 }
 
 void print_rep ( report *rep )
@@ -109,10 +186,18 @@ void print_rep ( report *rep )
     printf("Issue description : %s\n",rep->text);
 }
 
-void add_rep( char filepath[20], char role[9], char user[20] )
+void add_rep( char filepath[20], char role[10], char user[20] )
 {
     report rep;
     int fd;
+
+    char pstr[20];
+    obtain_permissions(filepath,pstr);
+    if ( check_Wperm(role,pstr) == 0 )
+    {
+        printf("You do not have permission to write to this file\n");
+        exit(-1);
+    }
 
     fd = open(filepath,O_WRONLY|O_APPEND,0664);
     rep.id = repid;
@@ -136,11 +221,22 @@ void add_rep( char filepath[20], char role[9], char user[20] )
     close(fd);
 }
 
-void list_repfile( char filepath[20], char role[9], char user[20] )
+void list_repfile( char filepath[20], char role[10], char user[20] )
 {
     report rep;
     int fd;
 
+    char pstr[20];
+    obtain_permissions(filepath,pstr);
+    if ( check_Rperm(role,pstr) == 0 )
+    {
+        printf("You do not have permission to read this file\n");
+        exit(-1);
+    }
+
+    struct stat st;
+    stat(filepath,&st);
+    printf("%s %ld %s\n",pstr,st.st_size,ctime(&st.st_mtim.tv_sec));
     fd = open(filepath,O_RDONLY,0664);
     while ( read(fd,&rep,sizeof(report)) == sizeof(report) )
     {
@@ -150,11 +246,19 @@ void list_repfile( char filepath[20], char role[9], char user[20] )
     close(fd);
 }
 
-void view_rep( char filepath[20], char role[9], char user[20], int id )
+void view_rep( char filepath[20], char role[10], char user[20], int id )
 {
     report rep;
     int fd;
     int found = 0;
+
+    char pstr[20];
+    obtain_permissions(filepath,pstr);
+    if ( check_Rperm(role,pstr) == 0 )
+    {
+        printf("You do not have permission to read this file\n");
+        exit(-1);
+    }
 
     fd = open(filepath,O_RDONLY,0664);
     while ( read(fd,&rep,sizeof(report)) == sizeof(report) )
@@ -172,12 +276,25 @@ void view_rep( char filepath[20], char role[9], char user[20], int id )
     close(fd);
 }
 
-void remove_rep( char filepath[20], char role[9], char user[20], int id )
+void remove_rep( char filepath[20], char role[10], char user[20], int id )
 {
     report rep;
     int fd;
     int found = 0;
     int size = 0;
+
+    if ( strcmp(role,"manager") != 0 )
+    {
+        printf("Only managers may execute this command\n");
+        exit(-1);
+    }
+    char pstr[20];
+    obtain_permissions(filepath,pstr);
+    if ( check_Wperm(role,pstr) == 0 )
+    {
+        printf("You do not have permission to write to this file\n");
+        exit(-1);
+    }
 
     fd = open(filepath,O_RDWR,0664);
     while ( read(fd,&rep,sizeof(report)) == sizeof(report) )
@@ -204,9 +321,27 @@ void remove_rep( char filepath[20], char role[9], char user[20], int id )
     close(fd);
 }
 
-void update_threshold( char filepath[20], char role[9], char user[20], int value )
+void update_threshold( char filepath[20], char role[10], char user[20], int value )
 {
     int fd;
+
+    if ( strcmp(role,"manager") != 0 )
+    {
+        printf("Only managers may execute this command\n");
+        exit(-1);
+    }
+    char pstr[20];
+    obtain_permissions(filepath,pstr);
+    if ( strcmp(pstr,"rw-r-----") != 0 )
+    {
+        printf("Permission bits are incorect\n");
+        exit(-1);
+    }
+    if ( check_Wperm(role,pstr) == 0 )
+    {
+        printf("You do not have permission to write to this file\n");
+        exit(-1);
+    }
 
     fd = open(filepath,O_WRONLY,0640);
     write(fd,&value,sizeof(int));
@@ -256,7 +391,7 @@ int parse_condition(const char *input, char *field, char *op, char *value)
     
     strncpy(op, first_colon + 1, op_len);
     op[op_len] = '\0';
-    
+
     // Validate operator
     if (strcmp(op, "==") != 0 && 
         strcmp(op, "!=") != 0 && 
@@ -286,7 +421,6 @@ int parse_condition(const char *input, char *field, char *op, char *value)
     }
     
     strcpy(value, value_start);
-    
     return 0; // Success
 }
 
@@ -340,25 +474,74 @@ int match_condition(report *r, const char *field, const char *op, const char *va
     return 0; // Unsupported field or operator
 }
 
-void filter_repfile( char filepath[20], char role[9], char user[20], char condition[50] )
+void filter_repfile( char filepath[20], char role[10], char user[20], char **conditions, int count )
 {
+    report *repv;
     report rep;
+    int k = 0;
+    int chunks = 1;
     int fd;
     char field[20],op[4],value[20];
 
-    printf("OK");
-    printf("%d",parse_condition(condition,field,op,value));
-    fd = open(filepath,O_RDONLY,0664);
-    printf("%s:%s:%s",field,op,value);
-    while ( read(fd,&rep,sizeof(report)) == sizeof(report) )
+    char pstr[20];
+    obtain_permissions(filepath,pstr);
+    if ( check_Rperm(role,pstr) == 0 )
     {
-        printf("%d",rep.severity);
-        if ( match_condition(&rep,field,op,value) == 1 )
-        {
-            print_rep(&rep);
-            printf("\n");
-        }
+        printf("You do not have permission to read this file\n");
+        exit(-1);
     }
+
+    repv = (report*)malloc(sizeof(report)*100);
+    int first_read = 1 ;
+    while ( count != 0 )
+    {
+        if ( parse_condition(conditions[count-1],field,op,value) != 0 )
+        {
+            printf("failed to extract condition");
+            exit(-1);
+        }
+        if ( first_read == 1 )
+        {
+            first_read = 0;
+            fd = open(filepath,O_RDONLY,0664);
+            while ( read(fd,&rep,sizeof(report)) == sizeof(report) )
+            {
+                if ( k == 100*chunks )
+                {
+                    chunks++;
+                    repv = (report*)realloc(repv,sizeof(report)*100*chunks);
+                }
+                if ( match_condition(&rep,field,op,value) == 1 )
+                {
+                    repv[k] = rep;
+                    k++;
+                }
+            }
+        }
+        else
+        {
+            for ( int i = 0 ; i < k ; i++ )
+            {
+                if ( match_condition(&repv[i],field,op,value) != 1 )
+                {
+                    for ( int j = i ; j < k-1 ; j++ )
+                    {
+                        repv[j] = repv[j+1];
+                    }
+                    k--;
+                    i--;
+                }
+            }
+        }
+        count--;
+    }
+    for ( int i = 0 ; i < k ; i++ )
+    {
+        print_rep(&repv[i]);
+        if ( i != k - 1 )
+            printf("\n");
+    }
+    free(repv);
     close(fd);
 }
 
@@ -389,7 +572,7 @@ void add_log ( char *filepath, int argc, char **argv)
 
 int main ( int argc, char **argv )
 {   
-    char role[9],user[20];
+    char role[10],user[20];
     char dirpath[20];
     char filepath[20];
     FILE *f;
@@ -400,20 +583,20 @@ int main ( int argc, char **argv )
 
     if ( argc < 6 )
     {
-        printf("Incorect number of arguments");
+        printf("Incorect number of arguments\n");
         exit(-1);
     }
 
     if( strcmp(argv[1],"--role") != 0 )
     {
-        printf("Arguments incorect ( usage : city_manager --role ROLE --user USER --command)");
+        printf("Arguments incorect ( usage : city_manager --role ROLE --user USER --command)\n");
         exit(-1);
     }
     strcpy(role,argv[2]);
 
     if( strcmp(argv[3],"--user") != 0 )
     {
-        printf("Arguments incorect ( usage : city_manager --role ROLE --user USER --command)");
+        printf("Arguments incorect ( usage : city_manager --role ROLE --user USER --command)\n");
         exit(-1);
     }
     strcpy(user,argv[4]);
@@ -426,7 +609,7 @@ int main ( int argc, char **argv )
     {
         if ( argc != 7 )
         {
-            printf("Incorect number of arguments");
+            printf("Incorect number of arguments\n");
             exit(-1);
         }
         setup_directory(argv[6]);
@@ -437,7 +620,7 @@ int main ( int argc, char **argv )
     {
         if ( argc != 7 )
         {
-            printf("Incorect number of arguments");
+            printf("Incorect number of arguments\n");
             exit(-1);
         }
         setup_directory(argv[6]);
@@ -448,7 +631,7 @@ int main ( int argc, char **argv )
     {
         if ( argc != 8 )
         {
-            printf("Incorect number of arguments");
+            printf("Incorect number of arguments\n");
             exit(-1);
         }
         setup_directory(argv[6]);
@@ -459,18 +642,18 @@ int main ( int argc, char **argv )
     {
         if ( argc != 8 )
         {
-            printf("Incorect number of arguments");
+            printf("Incorect number of arguments\n");
             exit(-1);
         }
         setup_directory(argv[6]);
         strcat(filepath,"reports.dat");
         remove_rep(filepath,role,user,atoi(argv[7]));
     }
-    else if ( strcmp(argv[5],"--update_threshold") == 0)
+    else if ( strcmp(argv[5],"--update_threshold\n") == 0)
     {
         if ( argc != 8 )
         {
-            printf("Incorect number of arguments");
+            printf("Incorect number of arguments\n");
             exit(-1);
         }
         setup_directory(argv[6]);
@@ -479,18 +662,18 @@ int main ( int argc, char **argv )
     }
     else if ( strcmp(argv[5],"--filter") == 0)
     {
-        if ( argc != 8 )
+        if ( argc < 8 )
         {
-            printf("Incorect number of arguments");
+            printf("Incorect number of arguments\n");
             exit(-1);
         }
         setup_directory(argv[6]);
         strcat(filepath,"reports.dat");
-        filter_repfile(filepath,role,user,argv[7]);
+        filter_repfile(filepath,role,user,argv+7,argc-7);
     }
     else
     {
-        printf("Incorrect command");
+        printf("Incorrect command\n");
         exit(-1);
     }
 
