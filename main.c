@@ -34,10 +34,10 @@ int isDir (const char* fileName)
 void increment_repid()
 {
     repid++;
-    FILE *f;
-    f = fopen("id.txt","w");
-    fprintf(f,"%d",repid);
-    fclose(f);
+    int fd;
+    fd = open("id.txt",O_WRONLY,0644);
+    write(fd,&repid,sizeof(int));
+    close(fd);
 }
 
 //UNUSED FOR NOW!; DIDN'T MAKE USE OF LINKS
@@ -575,11 +575,11 @@ int main ( int argc, char **argv )
     char role[10],user[20];
     char dirpath[20];
     char filepath[20];
-    FILE *f;
+    int fd;
 
-    f = fopen("id.txt","r");
-    fscanf(f,"%d",&repid);
-    fclose(f);
+    fd = open("id.txt",O_RDONLY,0644);
+    read(fd,&repid,sizeof(int));
+    close(fd);
 
     if ( argc < 6 )
     {
