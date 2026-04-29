@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -545,6 +546,62 @@ void filter_repfile( char filepath[20], char role[10], char user[20], char **con
     close(fd);
 }
 
+void remove_district( char district[20], char role[10], char user[20] )
+{
+    if ( strcmp(role,"manager") != 0 )
+    {
+        printf("Only managers may execute this command\n");
+        exit(-1);
+    }
+
+    if ( strcmp(district,"/") == 0 )
+    {
+        printf("Cannot delete the root file");
+        exit(-1);
+    }
+    if ( strcmp(district,"..") == 0 )
+    {
+        printf("Cannot delete the root directory of the program");
+        exit(-1);
+    }
+    if ( strcmp(district,".") == 0 )
+    {
+        printf("Cannot delete the current directory of the program");
+        exit(-1);
+    }
+
+    //delete directory
+    pid_t pid;
+    pid = fork();
+    if ( pid == 0 )
+    {
+        execlp("rm","rm","-rf",district,NULL);
+    }
+    else if ( pid > 0 )
+    {
+        if ( wait(NULL) != -1 )
+        {
+            char slink[50];
+            strcpy(slink,"active_reports-");
+            strcat(slink,district);
+            if ( unlink(slink) == -1 )
+            {
+                printf("Error unlink");
+                exit(-1);
+            }
+        }
+        else
+        {
+            printf("Error wait");
+        }
+    }
+    else
+    {
+        printf("Error fork");
+        exit(-1);
+    }
+}
+
 void add_log ( char *filepath, int argc, char **argv)
 {
     int fd;
@@ -603,7 +660,7 @@ int main ( int argc, char **argv )
 
     strcpy(dirpath,argv[6]);
     strcat(dirpath,"/");
-    strcat(filepath,dirpath);   
+    strcpy(filepath,dirpath);   
 
     if ( strcmp(argv[5],"--add") == 0 )
     {
@@ -670,6 +727,28 @@ int main ( int argc, char **argv )
         setup_directory(argv[6]);
         strcat(filepath,"reports.dat");
         filter_repfile(filepath,role,user,argv+7,argc-7);
+    }
+    else if ( strcmp(argv[5],"--remove_district") == 0 )
+    {
+        if ( argc != 7 )
+        {
+            printf("Incorect number of arguments\n");
+            exit(-1);
+        }
+        struct stat st;
+
+        if ( stat(argv[6],&st) == -1 )
+        {
+            printf("District does not exist ; Nothing to delete\n");
+        }       
+        if ( isDir(argv[6]) == 0 )
+        {
+            printf("File already exists and is not a directory\n");
+        }
+        else
+        {
+            remove_district(argv[6],role,user);
+        }
     }
     else
     {
