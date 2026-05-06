@@ -220,6 +220,33 @@ void add_rep( char filepath[20], char role[10], char user[20] )
     write(fd,&rep,sizeof(rep));
     increment_repid();
     close(fd);
+
+    char log[20];
+    log[0]='\0';
+    strncpy(log,filepath,strlen(filepath)-strlen(strchr(filepath,'/')));
+    log[strlen(filepath)-strlen(strchr(filepath,'/'))] = 0;
+    strcat(log,"/logged_district");
+
+    printf("%s\n",log);
+    pid_t mrpid = 0;
+    fd = open(".monitor_pid",O_RDONLY,0666);
+    if ( fd == -1 )
+    {
+        printf("Could not open monitor_pid file");
+        return;
+    }
+    if ( read(fd,&mrpid,sizeof(pid_t)) != sizeof(pid_t) )
+    {
+        printf("Could not read from monitor_pid file");
+        close(fd);
+        return;
+    }
+    close(fd);
+    if ( kill(mrpid,SIGUSR1) != 0 )
+    {
+        printf("Could not send signal to monitor_reports");
+        return;
+    }
 }
 
 void list_repfile( char filepath[20], char role[10], char user[20] )
