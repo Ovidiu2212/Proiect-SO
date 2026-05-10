@@ -1,3 +1,5 @@
+=== Phase 1 ===
+
 \# Prompt 1
 
 Prompt : In C code, write a function : int parse\_condition(const char \*input, char \*field, char \*op, char \*value); which splits a field:operator:value string into its three parts. Supported fields: severity, category, inspector, timestamp. Supported operators: ==, !=, <, <=, >, >=.
@@ -17,7 +19,13 @@ Deepseek AI result : a correct match\_condition function, just a big block of if
 
 What I changed : Removed some unnecesarry comments.
 
-What I learned : This function wouldn't have been hard to build, just time consuming and AI can save some a lot of time sometimes. 
+What I learned : This function wouldn't have been hard to build, just time consuming and AI can save some a lot of time sometimes.
 
 Not even AI uses switch case and enum ( this is a joke ).
+
+
+
+=== Phase 2 ===
+
+I didn't use AI for this phase, because it was shorter and easier than phase 1 and I wasn't specifically asked to use it.
 
