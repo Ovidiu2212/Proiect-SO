@@ -9,6 +9,13 @@
 void create_pid_file()
 {
     int fd;
+    fd = open(".monitor_pid",O_WRONLY,0666);
+    if ( fd != - 1 )
+    {
+        printf("Monitor_Reports is already open\n");
+        exit(-1);
+    }
+
     fd = open(".monitor_pid",O_CREAT|O_WRONLY,0666);
 
     pid_t pid;
